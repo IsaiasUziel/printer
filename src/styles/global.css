@@ -282,25 +282,8 @@ body {
 }
 .size-note { font-weight: 400; color: #9ca3af; font-size: 11px; }
 
-.orient-ctrl {
-  display: inline-flex;
-  gap: 4px;
-}
-.orient-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #9ca3af;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
-}
-.orient-btn:hover { border-color: #2563eb; color: #2563eb; }
-.orient-btn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+/* orient icon buttons share the btn-group-item style; just size the svg area */
+.orient-item { padding: 7px 10px; line-height: 0; }
 
 .setting-check {
   display: flex;
@@ -407,7 +390,6 @@ body {
     break-after: page;
   }
   .print-page:last-child { break-after: avoid; }
-  .print-page.is-landscape { page: landscape-page; }
 
   .print-cell {
     overflow: hidden;

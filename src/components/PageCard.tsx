@@ -8,13 +8,16 @@ interface Props {
   page: PageConfig
   pageNumber: number
   margin: number
+  orientation: 'portrait' | 'landscape'
   format: PaperFormat
   onUpdate: (updates: Partial<PageConfig>) => void
   onRemove: () => void
 }
 
-export default function PageCard({ page, pageNumber, margin, format, onUpdate, onRemove }: Props) {
+export default function PageCard({ page, pageNumber, margin, orientation, format, onUpdate, onRemove }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { w: effW, h: effH } = effectiveDims(orientation, format)
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -24,8 +27,7 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
       const img = new Image()
       img.onload = () => {
         const ar = img.naturalWidth / img.naturalHeight
-        const { w, h } = effectiveDims(page, format)
-        const grid = calculateGrid(page.count, ar, w, h)
+        const grid = calculateGrid(page.count, ar, effW, effH)
         onUpdate({ imageDataUrl: dataUrl, imageAR: ar, ...grid })
       }
       img.src = dataUrl
@@ -39,7 +41,7 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
       const file = e.dataTransfer.files[0]
       if (file) handleFile(file)
     },
-    [page.count, format],
+    [page.count, effW, effH],
   )
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -52,24 +54,13 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
 
   const handleCountChange = (next: number) => {
     if (next < 1 || next > 64) return
-    const { w, h } = effectiveDims(page, format)
-    const grid = calculateGrid(next, page.imageAR, w, h)
+    const grid = calculateGrid(next, page.imageAR, effW, effH)
     onUpdate({ count: next, ...grid })
   }
-
-  const handleOrientationChange = (orient: 'portrait' | 'landscape') => {
-    const { w, h } = effectiveDims({ orientation: orient }, format)
-    const grid = calculateGrid(page.count, page.imageAR, w, h)
-    onUpdate({ orientation: orient, ...grid })
-  }
-
-  // Effective page dimensions after orientation
-  const { w: effW, h: effH } = effectiveDims(page, format)
 
   // Preview dimensions — respect effective aspect ratio
   const prevW = 200
   const prevH = Math.round(prevW * (effH / effW))
-  // Scale margin from mm to preview pixels
   const marginPx = margin * (prevW / effW)
 
   // Printed image dimensions in cm
@@ -137,30 +128,6 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
                 onChange={(e) => handleCountChange(parseInt(e.target.value) || 1)}
               />
               <button onClick={() => handleCountChange(page.count + 1)}>+</button>
-            </div>
-          </div>
-
-          <div className="setting-row">
-            <span className="setting-label">Orientation</span>
-            <div className="orient-ctrl">
-              <button
-                className={`orient-btn${page.orientation === 'portrait' ? ' active' : ''}`}
-                onClick={() => handleOrientationChange('portrait')}
-                title="Portrait"
-              >
-                <svg viewBox="0 0 10 14" width="10" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
-                  <rect x="0.75" y="0.75" width="8.5" height="12.5" rx="1.25" />
-                </svg>
-              </button>
-              <button
-                className={`orient-btn${page.orientation === 'landscape' ? ' active' : ''}`}
-                onClick={() => handleOrientationChange('landscape')}
-                title="Landscape"
-              >
-                <svg viewBox="0 0 14 10" width="14" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
-                  <rect x="0.75" y="0.75" width="12.5" height="8.5" rx="1.25" />
-                </svg>
-              </button>
             </div>
           </div>
 
