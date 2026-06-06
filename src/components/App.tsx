@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { PageConfig } from '../lib/types'
+import { effectiveDims } from '../lib/types'
 import type { PaperFormat } from '../lib/formats'
 import { FORMATS, DEFAULT_FORMAT } from '../lib/formats'
 import { calculateGrid } from '../lib/grid'
@@ -17,6 +18,7 @@ function newPage(): PageConfig {
     cols: 2,
     rows: 2,
     fit: 'contain',
+    orientation: 'portrait',
   }
 }
 
@@ -40,7 +42,10 @@ export default function App() {
       el.id = 'dyn-page-size'
       document.head.appendChild(el)
     }
-    el.textContent = `@page { size: ${format.w}mm ${format.h}mm portrait; margin: 0; }`
+    el.textContent = [
+      `@page { size: ${format.w}mm ${format.h}mm portrait; margin: 0; }`,
+      `@page landscape-page { size: ${format.h}mm ${format.w}mm landscape; margin: 0; }`,
+    ].join('\n')
   }, [format])
 
   // Recalculate all grids when format changes
@@ -48,7 +53,8 @@ export default function App() {
     setPages((prev) =>
       prev.map((pg) => {
         if (!pg.imageDataUrl) return pg
-        return { ...pg, ...calculateGrid(pg.count, pg.imageAR, format.w, format.h) }
+        const { w, h } = effectiveDims(pg, format)
+        return { ...pg, ...calculateGrid(pg.count, pg.imageAR, w, h) }
       }),
     )
   }, [format])
@@ -74,7 +80,8 @@ export default function App() {
           const current = pagesRef.current
           const target = current.find((p) => !p.imageDataUrl) ?? current[current.length - 1]
           if (target) {
-            const grid = calculateGrid(target.count, ar, fmt.w, fmt.h)
+            const { w, h } = effectiveDims(target, fmt)
+            const grid = calculateGrid(target.count, ar, w, h)
             setPages((prev) =>
               prev.map((p) =>
                 p.id === target.id ? { ...p, imageDataUrl: dataUrl, imageAR: ar, ...grid } : p,
@@ -188,10 +195,10 @@ export default function App() {
           .map((pg) => (
             <div
               key={pg.id}
-              className="print-page"
+              className={`print-page${pg.orientation === 'landscape' ? ' is-landscape' : ''}`}
               style={{
-                width: `${format.w}mm`,
-                height: `${format.h}mm`,
+                width: pg.orientation === 'landscape' ? `${format.h}mm` : `${format.w}mm`,
+                height: pg.orientation === 'landscape' ? `${format.w}mm` : `${format.h}mm`,
                 display: 'grid',
                 gridTemplateColumns: `repeat(${pg.cols}, 1fr)`,
                 gridTemplateRows: `repeat(${pg.rows}, 1fr)`,

@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import type { PageConfig } from '../lib/types'
+import { effectiveDims } from '../lib/types'
 import type { PaperFormat } from '../lib/formats'
 import { calculateGrid } from '../lib/grid'
 
@@ -23,7 +24,8 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
       const img = new Image()
       img.onload = () => {
         const ar = img.naturalWidth / img.naturalHeight
-        const grid = calculateGrid(page.count, ar, format.w, format.h)
+        const { w, h } = effectiveDims(page, format)
+        const grid = calculateGrid(page.count, ar, w, h)
         onUpdate({ imageDataUrl: dataUrl, imageAR: ar, ...grid })
       }
       img.src = dataUrl
@@ -50,19 +52,29 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
 
   const handleCountChange = (next: number) => {
     if (next < 1 || next > 64) return
-    const grid = calculateGrid(next, page.imageAR, format.w, format.h)
+    const { w, h } = effectiveDims(page, format)
+    const grid = calculateGrid(next, page.imageAR, w, h)
     onUpdate({ count: next, ...grid })
   }
 
-  // Preview dimensions — respect the format's aspect ratio
+  const handleOrientationChange = (orient: 'portrait' | 'landscape') => {
+    const { w, h } = effectiveDims({ orientation: orient }, format)
+    const grid = calculateGrid(page.count, page.imageAR, w, h)
+    onUpdate({ orientation: orient, ...grid })
+  }
+
+  // Effective page dimensions after orientation
+  const { w: effW, h: effH } = effectiveDims(page, format)
+
+  // Preview dimensions — respect effective aspect ratio
   const prevW = 200
-  const prevH = Math.round(prevW * (format.h / format.w))
+  const prevH = Math.round(prevW * (effH / effW))
   // Scale margin from mm to preview pixels
-  const marginPx = margin * (prevW / format.w)
+  const marginPx = margin * (prevW / effW)
 
   // Printed image dimensions in cm
-  const availW_mm = format.w - 2 * margin
-  const availH_mm = format.h - 2 * margin
+  const availW_mm = effW - 2 * margin
+  const availH_mm = effH - 2 * margin
   const cellW_mm = availW_mm / page.cols
   const cellH_mm = availH_mm / page.rows
   const imgSize = (() => {
@@ -125,6 +137,30 @@ export default function PageCard({ page, pageNumber, margin, format, onUpdate, o
                 onChange={(e) => handleCountChange(parseInt(e.target.value) || 1)}
               />
               <button onClick={() => handleCountChange(page.count + 1)}>+</button>
+            </div>
+          </div>
+
+          <div className="setting-row">
+            <span className="setting-label">Orientation</span>
+            <div className="orient-ctrl">
+              <button
+                className={`orient-btn${page.orientation === 'portrait' ? ' active' : ''}`}
+                onClick={() => handleOrientationChange('portrait')}
+                title="Portrait"
+              >
+                <svg viewBox="0 0 10 14" width="10" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+                  <rect x="0.75" y="0.75" width="8.5" height="12.5" rx="1.25" />
+                </svg>
+              </button>
+              <button
+                className={`orient-btn${page.orientation === 'landscape' ? ' active' : ''}`}
+                onClick={() => handleOrientationChange('landscape')}
+                title="Landscape"
+              >
+                <svg viewBox="0 0 14 10" width="14" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+                  <rect x="0.75" y="0.75" width="12.5" height="8.5" rx="1.25" />
+                </svg>
+              </button>
             </div>
           </div>
 
