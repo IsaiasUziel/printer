@@ -2,7 +2,7 @@
 
 A web app for composing multi-page print documents where each page tiles a single image N times across a letter, A4, or Legal sheet — ready to export as PDF via the browser print dialog.
 
-**Live demo →** *(see repository About section)*
+**Live demo → [printer-lovat.vercel.app](https://printer-lovat.vercel.app)**
 
 ---
 
