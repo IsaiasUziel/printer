@@ -97,6 +97,17 @@ body {
   flex-wrap: wrap;
 }
 
+/* ── GitHub link ─────────────────────────────────────────── */
+.github-link {
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  border-radius: 6px;
+  padding: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.github-link:hover { color: #1a1a1a; background: rgba(0,0,0,0.06); }
+
 /* ── Margin control ──────────────────────────────────────── */
 .margin-ctrl {
   display: flex;
