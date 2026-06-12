@@ -1,8 +1,9 @@
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 import type { PageConfig } from '../lib/types'
 import { effectiveDims } from '../lib/types'
 import type { PaperFormat } from '../lib/formats'
 import { calculateGrid } from '../lib/grid'
+import { readImageFile } from '../lib/image'
 
 interface Props {
   page: PageConfig
@@ -19,37 +20,23 @@ export default function PageCard({ page, pageNumber, margin, orientation, format
 
   const { w: effW, h: effH } = effectiveDims(orientation, format)
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      const img = new Image()
-      img.onload = () => {
-        const ar = img.naturalWidth / img.naturalHeight
-        const grid = calculateGrid(page.count, ar, effW, effH)
-        onUpdate({ imageDataUrl: dataUrl, imageAR: ar, ...grid })
-      }
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(file)
+  const handleFile = async (file: File) => {
+    const loaded = await readImageFile(file)
+    if (!loaded) return
+    const grid = calculateGrid(page.count, loaded.ar, effW, effH)
+    onUpdate({ imageDataUrl: loaded.dataUrl, imageAR: loaded.ar, ...grid })
   }
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      const file = e.dataTransfer.files[0]
-      if (file) handleFile(file)
-    },
-    [page.count, effW, effH],
-  )
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     const imgItem = Array.from(e.clipboardData.items).find((i) => i.type.startsWith('image/'))
-    if (imgItem) {
-      const file = imgItem.getAsFile()
-      if (file) handleFile(file)
-    }
+    const file = imgItem?.getAsFile()
+    if (file) handleFile(file)
   }
 
   const handleCountChange = (next: number) => {
@@ -58,10 +45,10 @@ export default function PageCard({ page, pageNumber, margin, orientation, format
     onUpdate({ count: next, ...grid })
   }
 
-  // Preview dimensions — respect effective aspect ratio
-  const prevW = 200
-  const prevH = Math.round(prevW * (effH / effW))
-  const marginPx = margin * (prevW / effW)
+  // Margin as a fraction of sheet size — CSS % padding is always relative
+  // to width, so a single horizontal fraction yields equal mm on all sides
+  const marginPctW = (margin / effW) * 100
+  const marginPctH = (margin / effH) * 100
 
   // Printed image dimensions in cm
   const availW_mm = effW - 2 * margin
@@ -84,32 +71,72 @@ export default function PageCard({ page, pageNumber, margin, orientation, format
       </div>
 
       <div className="page-card-body">
-        {/* Upload zone */}
-        <div
-          className={`upload-zone${page.imageDataUrl ? ' has-image' : ''}`}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onPaste={handlePaste}
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-        >
-          {page.imageDataUrl ? (
-            <img src={page.imageDataUrl} alt="uploaded" className="upload-thumb" />
-          ) : (
-            <span className="upload-hint">Drop, click, or paste</span>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) handleFile(f)
-            }}
-          />
+        {/* The sheet — preview and upload zone in one */}
+        <div className="sheet-wrap">
+          <div
+            className={`sheet upload-zone${page.imageDataUrl ? '' : ' empty'}`}
+            style={{ aspectRatio: `${effW} / ${effH}` }}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onPaste={handlePaste}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            aria-label={page.imageDataUrl ? 'Replace image' : 'Upload image'}
+            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+          >
+            {page.imageDataUrl ? (
+              <>
+                <div
+                  className="sheet-grid"
+                  style={{
+                    gridTemplateColumns: `repeat(${page.cols}, 1fr)`,
+                    gridTemplateRows: `repeat(${page.rows}, 1fr)`,
+                    padding: `${marginPctW}%`,
+                  }}
+                >
+                  {Array.from({ length: page.count }, (_, i) => (
+                    <div key={i} className="sheet-cell">
+                      <img src={page.imageDataUrl!} alt="" style={{ objectFit: page.fit }} />
+                    </div>
+                  ))}
+                </div>
+                {margin > 0 && (
+                  <div
+                    className="sheet-guides"
+                    style={{
+                      top: `${marginPctH}%`,
+                      bottom: `${marginPctH}%`,
+                      left: `${marginPctW}%`,
+                      right: `${marginPctW}%`,
+                    }}
+                  />
+                )}
+                {imgSize && (
+                  <span className="sheet-badge">
+                    {imgSize.w.toFixed(1)} × {imgSize.h.toFixed(1)} cm each
+                    {page.fit === 'cover' && <span className="size-note"> · cropped</span>}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="sheet-hint">
+                Drop an image,
+                <br />
+                paste (⌘V), or click
+              </span>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleFile(f)
+              }}
+            />
+          </div>
         </div>
 
         {/* Settings */}
@@ -131,17 +158,18 @@ export default function PageCard({ page, pageNumber, margin, orientation, format
             </div>
           </div>
 
-          <div className="setting-row">
-            <span className="setting-label">Grid</span>
-            <span className="setting-value">{page.cols} × {page.rows}</span>
-          </div>
+          {page.imageDataUrl && (
+            <div className="setting-row">
+              <span className="setting-label">Grid</span>
+              <span className="setting-value">{page.cols} × {page.rows}</span>
+            </div>
+          )}
 
           {imgSize && (
             <div className="setting-row">
               <span className="setting-label">Each image</span>
               <span className="setting-value image-size">
                 {imgSize.w.toFixed(1)} × {imgSize.h.toFixed(1)} cm
-                {page.fit === 'cover' && <span className="size-note"> (cropped)</span>}
               </span>
             </div>
           )}
@@ -154,29 +182,11 @@ export default function PageCard({ page, pageNumber, margin, orientation, format
             />
             Fill cell (crop if needed)
           </label>
-        </div>
 
-        {/* Preview */}
-        {page.imageDataUrl && (
-          <div className="page-preview" style={{ width: prevW, height: prevH }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${page.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${page.rows}, 1fr)`,
-                width: '100%',
-                height: '100%',
-                padding: marginPx,
-              }}
-            >
-              {Array.from({ length: page.count }, (_, i) => (
-                <div key={i} className="preview-cell">
-                  <img src={page.imageDataUrl!} alt="" style={{ objectFit: page.fit }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          {page.imageDataUrl && (
+            <p className="settings-hint">Click the sheet to replace the image.</p>
+          )}
+        </div>
       </div>
     </div>
   )

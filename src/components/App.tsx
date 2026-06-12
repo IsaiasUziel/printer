@@ -4,6 +4,7 @@ import { effectiveDims } from '../lib/types'
 import type { PaperFormat } from '../lib/formats'
 import { FORMATS, DEFAULT_FORMAT } from '../lib/formats'
 import { calculateGrid } from '../lib/grid'
+import { readImageFile } from '../lib/image'
 import PageCard from './PageCard'
 import PrintFab from './PrintFab'
 
@@ -27,6 +28,8 @@ export default function App() {
   const [format, setFormat] = useState<PaperFormat>(DEFAULT_FORMAT)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
 
+  const heroInputRef = useRef<HTMLInputElement>(null)
+
   const pagesRef = useRef(pages)
   pagesRef.current = pages
   const formatRef = useRef(format)
@@ -35,6 +38,15 @@ export default function App() {
   orientRef.current = orientation
 
   const addPage = () => setPages((p) => [...p, newPage()])
+
+  const addPageWithFile = async (file: File) => {
+    const loaded = await readImageFile(file)
+    if (!loaded) return
+    const { w, h } = effectiveDims(orientRef.current, formatRef.current)
+    const pg = newPage()
+    const grid = calculateGrid(pg.count, loaded.ar, w, h)
+    setPages((prev) => [...prev, { ...pg, imageDataUrl: loaded.dataUrl, imageAR: loaded.ar, ...grid }])
+  }
 
   // Inject a single @page rule — format + orientation — so Chrome honors it
   useEffect(() => {
@@ -66,38 +78,30 @@ export default function App() {
       const imgItem = Array.from(e.clipboardData?.items ?? []).find((i) =>
         i.type.startsWith('image/'),
       )
-      if (!imgItem) return
-      const file = imgItem.getAsFile()
+      const file = imgItem?.getAsFile()
       if (!file) return
 
-      const fmt = formatRef.current
-      const ori = orientRef.current
-      const { w, h } = effectiveDims(ori, fmt)
-
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string
-        const img = new Image()
-        img.onload = () => {
-          const ar = img.naturalWidth / img.naturalHeight
-          const current = pagesRef.current
-          const target = current.find((p) => !p.imageDataUrl) ?? current[current.length - 1]
-          if (target) {
-            const grid = calculateGrid(target.count, ar, w, h)
-            setPages((prev) =>
-              prev.map((p) =>
-                p.id === target.id ? { ...p, imageDataUrl: dataUrl, imageAR: ar, ...grid } : p,
-              ),
-            )
-          } else {
-            const pg = newPage()
-            const grid = calculateGrid(pg.count, ar, w, h)
-            setPages([{ ...pg, imageDataUrl: dataUrl, imageAR: ar, ...grid }])
-          }
+      void (async () => {
+        const loaded = await readImageFile(file)
+        if (!loaded) return
+        const { w, h } = effectiveDims(orientRef.current, formatRef.current)
+        const current = pagesRef.current
+        const target = current.find((p) => !p.imageDataUrl) ?? current[current.length - 1]
+        if (target) {
+          const grid = calculateGrid(target.count, loaded.ar, w, h)
+          setPages((prev) =>
+            prev.map((p) =>
+              p.id === target.id
+                ? { ...p, imageDataUrl: loaded.dataUrl, imageAR: loaded.ar, ...grid }
+                : p,
+            ),
+          )
+        } else {
+          const pg = newPage()
+          const grid = calculateGrid(pg.count, loaded.ar, w, h)
+          setPages([{ ...pg, imageDataUrl: loaded.dataUrl, imageAR: loaded.ar, ...grid }])
         }
-        img.src = dataUrl
-      }
-      reader.readAsDataURL(file)
+      })()
     }
 
     document.addEventListener('paste', onGlobalPaste)
@@ -192,9 +196,41 @@ export default function App() {
       <div className="app no-print">
         {pages.length === 0 ? (
           <div className="empty-state">
-            <p>No pages yet.</p>
-            <button className="btn btn-primary" onClick={addPage}>
-              + New page
+            <div
+              className="drop-hero"
+              style={{ aspectRatio: `${effW} / ${effH}` }}
+              onClick={() => heroInputRef.current?.click()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const file = e.dataTransfer.files[0]
+                if (file) addPageWithFile(file)
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              role="button"
+              tabIndex={0}
+              aria-label="Upload an image to start"
+              onKeyDown={(e) => e.key === 'Enter' && heroInputRef.current?.click()}
+            >
+              <svg className="drop-hero-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <span className="drop-hero-title">Drop an image here</span>
+              <span className="drop-hero-sub">paste (⌘V) or click to browse</span>
+              <input
+                ref={heroInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) addPageWithFile(f)
+                }}
+              />
+            </div>
+            <button className="btn btn-secondary" onClick={addPage}>
+              or start with an empty page
             </button>
           </div>
         ) : (
@@ -215,7 +251,12 @@ export default function App() {
         )}
       </div>
 
-      <PrintFab visible={printableCount > 0} />
+      <PrintFab
+        visible={printableCount > 0}
+        pageCount={printableCount}
+        formatLabel={format.label}
+        orientation={orientation}
+      />
 
       {/* ── Print-only layout ─────────────────────────────────── */}
       <div className="print-only">
