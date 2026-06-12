@@ -110,6 +110,13 @@ body {
   gap: 16px;
 }
 
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .app-title {
   font-size: 20px;
   font-weight: 700;
@@ -214,6 +221,26 @@ body {
 
 /* ── Pages list ──────────────────────────────────────────── */
 .pages-list { display: flex; flex-direction: column; gap: 16px; }
+
+.add-page-tile {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 18px;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.add-page-tile:hover,
+.add-page-tile:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 
 /* ── Page card ───────────────────────────────────────────── */
 .page-card {
@@ -509,19 +536,44 @@ body {
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .app-header-inner { flex-wrap: wrap; row-gap: 10px; }
-  .app-actions {
-    width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-  .app-actions::-webkit-scrollbar { display: none; }
+  .app-header-inner { flex-wrap: wrap; row-gap: 10px; padding: 10px 14px; }
 
-  .page-card-body { flex-direction: column; }
-  .sheet-wrap { max-width: 100%; padding: 14px; }
-  .page-settings { min-width: 0; width: 100%; }
+  /* row 1: identity — title left, GitHub right */
+  .app-brand { width: 100%; justify-content: space-between; }
+  .app-title { font-size: 17px; }
+
+  /* row 2: document toolbar distributed edge to edge */
+  .app-actions { width: 100%; justify-content: space-between; gap: 8px; }
+  .btn-group-item { padding: 7px 10px; font-size: 12.5px; }
+  .margin-ctrl { font-size: 12px; gap: 4px; }
+  .margin-ctrl input { width: 44px; padding: 6px; }
+
+  .app { padding: 16px 12px 96px; }
+
+  .page-card-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px;
+  }
+  /* in column flow the flex-basis would become height — neutralize it */
+  .sheet-wrap {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    padding: 16px;
+  }
+
+  .page-settings {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 24px;
+    min-width: 0;
+    width: 100%;
+    padding-top: 0;
+  }
+  .settings-hint { width: 100%; }
 
   .fab-stack { bottom: 16px; right: 16px; }
 }

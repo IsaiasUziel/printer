@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 interface Props {
   visible: boolean
   pageCount: number
@@ -5,7 +7,17 @@ interface Props {
   orientation: 'portrait' | 'landscape'
 }
 
+const TIP_DURATION_MS = 7000
+
 export default function PrintFab({ visible, pageCount, formatLabel, orientation }: Props) {
+  const [tipVisible, setTipVisible] = useState(true)
+
+  useEffect(() => {
+    if (!visible) return
+    const t = setTimeout(() => setTipVisible(false), TIP_DURATION_MS)
+    return () => clearTimeout(t)
+  }, [visible])
+
   if (!visible) return null
 
   const summary = `${pageCount} ${pageCount === 1 ? 'page' : 'pages'} · ${formatLabel} · ${
@@ -14,7 +26,7 @@ export default function PrintFab({ visible, pageCount, formatLabel, orientation 
 
   return (
     <div className="fab-stack no-print">
-      <span className="fab-tip">Tip: set browser margins to “None”</span>
+      {tipVisible && <span className="fab-tip">Tip: set browser margins to “None”</span>}
       <button
         className="fab"
         onClick={() => window.print()}
